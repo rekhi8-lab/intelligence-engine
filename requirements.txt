@@ -1,0 +1,30 @@
+# Women's Health Content Intelligence Engine v3.0
+# Install all dependencies: pip install -r requirements.txt
+
+# AI / LLM
+anthropic>=0.25.0
+
+# Data sources
+praw>=7.7.0
+pytrends>=4.9.2
+yt-dlp>=2024.1.1
+youtube-transcript-api>=0.6.2
+google-api-python-client>=2.120.0
+
+# Image / OCR
+Pillow>=10.0.0
+pytesseract>=0.3.10
+
+# Web / server
+flask>=3.0.0
+flask-cors>=4.0.0
+requests>=2.31.0
+
+# Environment / config
+python-dotenv>=1.0.0
+
+# Google Drive auth
+google-auth>=2.28.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+google-cloud-storage>=2.14.0

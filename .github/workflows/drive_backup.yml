@@ -1,0 +1,61 @@
+name: Intelligence Pipeline (every 2 days)
+
+on:
+  schedule:
+    # 02:00 UTC on odd days (1st, 3rd, 5th...)
+    - cron: "0 2 */2 * *"
+  workflow_dispatch:   # manual trigger from GitHub UI
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Get the code ──────────────────────────────────────
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # ── 2. Python ────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── 3. Pull latest data from Drive ───────────────────────
+      - name: Download data from Google Drive
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+        run: python cloud_sync.py download
+
+      # ── 4. Run intelligence pipeline ─────────────────────────
+      - name: Run intelligence pipeline
+        env:
+          CLAUDE_API_KEY:         ${{ secrets.CLAUDE_API_KEY }}
+          YOUTUBE_API_KEY:        ${{ secrets.YOUTUBE_API_KEY }}
+          REDDIT_CLIENT_ID:       ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET:   ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_USER_AGENT:      "IntelligenceEngine/3.0"
+        run: python run_all.py
+
+      # ── 5. Generate content drafts ───────────────────────────
+      - name: Generate content drafts
+        env:
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        run: python content_generator.py
+
+      # ── 6. Push updated data + outputs back to Drive ─────────
+      - name: Upload results to Google Drive
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+        run: python cloud_sync.py upload
+
+      # ── 7. Summary ───────────────────────────────────────────
+      - name: Print run summary
+        run: |
+          echo "Pipeline complete. New drafts and updated DB uploaded to Drive."
+          echo "View at: https://drive.google.com/drive/folders/1tnU4bjFcLVdXx57yARwU__PVVvWoWPD1"

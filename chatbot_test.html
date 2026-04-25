@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Himalayan Naturals — Chatbot Test</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 60px auto; padding: 0 20px; color: #333; }
+    h1   { color: #7c4a85; }
+    .box { background: #f9f3fb; border: 1px solid #e0cfe6; border-radius: 12px; padding: 24px; margin: 24px 0; }
+    code { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+    pre  { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+  <h1>Himalayan Naturals — Chatbot Test Page</h1>
+  <p>This page tests the chat widget locally. The chat bubble should appear in the bottom-right corner.</p>
+
+  <div class="box">
+    <h3>Status</h3>
+    <p id="status">Checking server...</p>
+  </div>
+
+  <div class="box">
+    <h3>How to embed on your website</h3>
+    <p>Paste these two lines before the closing <code>&lt;/body&gt;</code> tag on your website:</p>
+    <pre id="embed-code">&lt;script&gt;
+  window.HNConfig = {
+    apiUrl: "https://YOUR-DEPLOYED-SERVER.com/chat",
+    botName: "Himalayan Naturals",
+    accentColor: "#7c4a85"
+  };
+&lt;/script&gt;
+&lt;script src="https://YOUR-DEPLOYED-SERVER.com/chatbot.js"&gt;&lt;/script&gt;</pre>
+  </div>
+
+  <div class="box">
+    <h3>Customisation options</h3>
+    <ul>
+      <li><code>apiUrl</code> — your deployed server URL + /chat</li>
+      <li><code>botName</code> — name shown in the chat header</li>
+      <li><code>accentColor</code> — hex colour for the bubble and messages</li>
+    </ul>
+  </div>
+
+  <!-- Chat widget — points to local server for testing -->
+  <script>
+    window.HNConfig = {
+      apiUrl: "http://localhost:5000/chat",
+      botName: "Himalayan Naturals",
+      accentColor: "#7c4a85"
+    };
+
+    // Health check
+    fetch("http://localhost:5000/health")
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById("status").innerHTML =
+          "<strong style='color:green'>Server running.</strong> Knowledge base: " +
+          (d.kb_loaded ? "<span style='color:green'>loaded</span>" : "<span style='color:red'>NOT FOUND — fill in knowledge_base.txt</span>");
+      })
+      .catch(() => {
+        document.getElementById("status").innerHTML =
+          "<strong style='color:red'>Server not running.</strong> Start it with: <code>python chatbot_server.py</code>";
+      });
+  </script>
+  <script src="http://localhost:5000/chatbot.js"></script>
+
+</body>
+</html>

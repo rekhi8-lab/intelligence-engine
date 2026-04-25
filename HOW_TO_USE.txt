@@ -1,0 +1,381 @@
+
+================================================================================
+  WOMEN'S HEALTH CONTENT INTELLIGENCE ENGINE v3.0
+  COMPLETE HOW-TO GUIDE
+================================================================================
+
+BRANDS COVERED:
+  - Global Menopause Collective (GMC)
+  - Endo Neutral
+  - Harmanjeet Rekhi (Personal Brand)
+
+REVENUE SOURCE: Himalayan Naturals supplements (Chatbot drives product discovery)
+
+--------------------------------------------------------------------------------
+SECTION 1 — FIRST-TIME SETUP (do this once)
+--------------------------------------------------------------------------------
+
+STEP 1: Install Python (if not already installed)
+  - Download Python 3.11+ from https://python.org
+  - During install, CHECK "Add Python to PATH"
+  - Verify: open Command Prompt, run: python --version
+
+STEP 2: Install all required packages
+  Open Command Prompt in the Trend Scraper folder, then run:
+
+    pip install anthropic google-generativeai praw pytrends
+    pip install yt-dlp google-api-python-client youtube-transcript-api
+    pip install flask flask-cors python-dotenv requests pillow pytesseract
+    pip install google-auth-oauthlib google-auth-httplib2
+
+STEP 3: Configure your API keys
+  Edit the file: C:\Users\Acer\Desktop\Trend Scraper\.env
+  Fill in:
+    CLAUDE_API_KEY=your_key_here
+    YOUTUBE_API_KEY=your_key_here
+    REDDIT_CLIENT_ID=your_key_here
+    REDDIT_CLIENT_SECRET=your_key_here
+    REDDIT_USER_AGENT=IntelligenceEngine/3.0
+
+  Get keys from:
+    - Claude:   https://console.anthropic.com
+    - YouTube:  https://console.cloud.google.com (enable YouTube Data API v3)
+    - Reddit:   https://www.reddit.com/prefs/apps (create "script" app)
+
+STEP 4: Initialise the database
+  In Command Prompt (Trend Scraper folder):
+
+    python database.py
+
+  You should see: "Database initialised at: intelligence.db"
+
+STEP 5: Migrate old data (if you have intelligence.json from v2)
+  Only needed if upgrading from a previous version:
+
+    python migrate.py
+
+STEP 6: Set up Google Drive backup (see Section 5 for full details)
+
+
+--------------------------------------------------------------------------------
+SECTION 2 — WEEKLY WORKFLOW (normal weekly use)
+--------------------------------------------------------------------------------
+
+Run these steps every week, in order:
+
+--- MONDAY: Gather intelligence ---
+
+  1. Run the full intelligence pipeline:
+       python run_all.py
+
+     This takes ~5-10 minutes. It will:
+       - Scrape Reddit, YouTube, Google Trends
+       - Feed data to Claude AI for analysis
+       - Save results to database
+       - Export intelligence.json snapshot
+
+  2. Review the output printed to screen — check trending topics,
+     content gaps, and YouTube title suggestions.
+
+
+--- TUESDAY: Create content drafts ---
+
+  3. Generate content for all three brands:
+       python content_generator.py
+
+     This creates:
+       - 3 LinkedIn posts (one per brand)
+       - 3 Instagram captions (one per brand)
+       - 1 WhatsApp expert community prompt
+       - Files saved to: output/drafts/
+
+  4. Review and edit drafts in: output/drafts/
+
+
+--- WEDNESDAY: Collect expert signals ---
+
+  5. Get the WhatsApp discussion prompt:
+       python whatsapp_import.py generate
+
+  6. Copy the prompt and send it to your 70-member WhatsApp expert group.
+
+  7. Collect their responses into a text file, e.g. responses_2026-04-28.txt
+     Format (one response per line, or separated by ---):
+       Dr Smith: Response text here
+       ---
+       Prof Jones: Another response here
+
+  8. Import their responses:
+       python whatsapp_import.py import responses_2026-04-28.txt
+
+     These will automatically feed into next Monday's run_all.py at high priority.
+
+
+--- THURSDAY: Post content ---
+
+  9. Post your reviewed drafts to LinkedIn, Instagram, YouTube.
+
+
+--- FRIDAY: Log performance ---
+
+  10. Log how your content is performing:
+        python auditor.py log
+
+      Follow the prompts to enter views, likes, comments etc.
+
+  11. For YouTube videos, auto-fetch stats with:
+        python auditor.py youtube https://youtu.be/your_video_id
+
+  12. View performance report:
+        python auditor.py report
+
+
+--- ANY TIME: Backup to Google Drive ---
+
+  13. Run backup:
+        python gdrive_backup.py backup
+
+      Or let the Task Scheduler run it automatically (see Section 5).
+
+
+--------------------------------------------------------------------------------
+SECTION 3 — INDIVIDUAL MODULE REFERENCE
+--------------------------------------------------------------------------------
+
+LISTENER BRAIN (intelligence pipeline):
+  python run_all.py            -- Run full pipeline
+  python listener_brain.py     -- Run brain module directly (same thing)
+
+QUERY ENGINE (search query pool):
+  The query pool is self-managing. Queries that produce good signals get
+  higher scores and are used more often. Bad queries decay and retire.
+  View the pool in the database: query_pool table.
+
+CONTENT GENERATOR:
+  python content_generator.py  -- Generate all brand content
+
+WHATSAPP IMPORTER:
+  python whatsapp_import.py generate              -- Show this week's prompt
+  python whatsapp_import.py import <file.txt>     -- Import expert responses
+  python whatsapp_import.py status                -- Show pending signals
+
+PERFORMANCE AUDITOR:
+  python auditor.py log                           -- Log a post's performance
+  python auditor.py youtube <url>                 -- Auto-fetch YouTube stats
+  python auditor.py report                        -- View performance report
+  python auditor.py report --days 30              -- Report for last 30 days
+  python auditor.py list                          -- List all logged posts
+
+CHATBOT SERVER (Himalayan Naturals product assistant):
+  python chatbot_server.py                        -- Start the chatbot server
+  Then open: chatbot_test.html in a browser to test it.
+  To embed on a website, add this to your HTML:
+    <script src="http://localhost:5000/chatbot.js"></script>
+
+TRANSCRIPT ANALYZER (analyse a YouTube transcript):
+  python transcript_analyzer.py                   -- Interactive mode
+
+THUMBNAIL ANALYZER (analyse a thumbnail image):
+  python thumbnail_analyzer.py <image.jpg>        -- Analyse an image
+
+GOOGLE DRIVE BACKUP:
+  python gdrive_backup.py migrate                 -- First-time full upload
+  python gdrive_backup.py backup                  -- Periodic backup snapshot
+  python gdrive_backup.py status                  -- Show Drive folder contents
+
+
+--------------------------------------------------------------------------------
+SECTION 4 — DATABASE REFERENCE
+--------------------------------------------------------------------------------
+
+All data lives in: intelligence.db (SQLite)
+
+Tables:
+  runs                -- Each pipeline run (timestamp, source counts)
+  trending_topics     -- Topics extracted per run
+  keywords            -- Expanded keywords per run
+  content_gaps        -- Content opportunities per run
+  youtube_titles      -- AI-suggested YouTube titles per run
+  thumbnail_ideas     -- Thumbnail text ideas per run
+  thumbnail_patterns  -- Thumbnail visual patterns per run
+  content_series      -- Series ideas per run
+  run_strategy        -- Posting + channel strategy per run
+  memory_keywords     -- Cross-run keyword frequency tracking
+  raw_signals         -- Raw scraped data sample per run
+  query_pool          -- Self-evolving search query scores
+  creative_packages   -- Transcript analysis outputs
+  content_drafts      -- Generated posts (LinkedIn, Instagram, WhatsApp)
+  content_performance -- Logged engagement metrics
+  whatsapp_signals    -- Expert community responses
+
+To browse the database, use DB Browser for SQLite:
+  https://sqlitebrowser.org/dl/ (free, Windows installer available)
+
+
+--------------------------------------------------------------------------------
+SECTION 5 — GOOGLE DRIVE BACKUP SETUP
+--------------------------------------------------------------------------------
+
+ONE-TIME SETUP:
+
+  Step A: Create Google Cloud Project
+    1. Go to: https://console.cloud.google.com
+    2. Click "Select a project" > "New Project"
+    3. Name it: IntelligenceEngine (or any name)
+    4. Click "Create"
+
+  Step B: Enable Google Drive API
+    1. In the left menu: APIs & Services > Library
+    2. Search for "Google Drive API"
+    3. Click it, then click "Enable"
+
+  Step C: Create OAuth Credentials
+    1. In the left menu: APIs & Services > Credentials
+    2. Click "+ CREATE CREDENTIALS" > "OAuth client ID"
+    3. If prompted, configure the OAuth consent screen first:
+       - User Type: External
+       - App name: IntelligenceEngine
+       - Add your Gmail as test user
+    4. Application type: Desktop app
+    5. Name: IntelligenceEngine Desktop
+    6. Click "Create"
+    7. Click "DOWNLOAD JSON"
+    8. Rename the downloaded file to: credentials.json
+    9. Move it to: C:\Users\Acer\Desktop\Trend Scraper\credentials.json
+
+  Step D: Run first-time migration
+    In Command Prompt (Trend Scraper folder):
+
+      python gdrive_backup.py migrate
+
+    A browser window opens. Sign in with your Google account.
+    Click "Allow" to grant access.
+    The file token.json is created automatically for future runs.
+
+    Migration uploads:
+      - All code files to Drive > code/
+      - Database and JSON to Drive > data/
+      - All output drafts to Drive > output/
+      - CLAUDE_CODE_HANDOFF.md to Drive root
+
+  Step E: Verify
+      python gdrive_backup.py status
+
+    View your Drive folder at:
+    https://drive.google.com/drive/folders/1tnU4bjFcLVdXx57yARwU__PVVvWoWPD1
+
+
+AUTOMATED BACKUP SCHEDULE:
+
+  To set up automatic weekly backups using Windows Task Scheduler:
+
+    1. Open PowerShell as Administrator
+    2. Navigate to Trend Scraper folder:
+         cd "C:\Users\Acer\Desktop\Trend Scraper"
+    3. Run the setup script:
+         powershell -ExecutionPolicy Bypass -File schedule_backup.ps1
+
+    This creates a task that runs every Monday at 9:00 AM.
+    You can view it in Task Scheduler > Task Scheduler Library > IntelligenceBackup
+
+  To run backup manually any time:
+    python gdrive_backup.py backup
+
+
+--------------------------------------------------------------------------------
+SECTION 6 — TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+"ModuleNotFoundError: No module named X"
+  Run: pip install X  (replace X with the module name)
+
+"credentials.json not found"
+  Follow Section 5 Step C to create and download the file.
+
+"Invalid API key" errors
+  Check your .env file — make sure there are no extra spaces or quotes around keys.
+  Correct format: CLAUDE_API_KEY=sk-ant-api03-...
+
+"No trends data" or empty Reddit results
+  Reddit and Google Trends can have temporary rate limits. Try again in 10 minutes.
+
+"Database is locked"
+  Another process is using intelligence.db. Close any database browsers,
+  wait a moment, then try again.
+
+"UnicodeEncodeError" on Windows
+  The terminal may not support all characters. This is handled automatically
+  by the scripts. If it persists, try running in Windows Terminal instead of
+  the default Command Prompt.
+
+"Token expired" for Google Drive
+  Delete token.json and run the migration again — it will re-authenticate.
+
+Chatbot not responding
+  Make sure chatbot_server.py is running (you'll see "Running on http://127.0.0.1:5000").
+  Check that CLAUDE_API_KEY is set in .env.
+
+
+--------------------------------------------------------------------------------
+SECTION 7 — FILE STRUCTURE REFERENCE
+--------------------------------------------------------------------------------
+
+Trend Scraper/
+  run_all.py              Main pipeline runner
+  listener_brain.py       AI intelligence engine (Claude Sonnet)
+  query_engine.py         Self-evolving query pool manager
+  database.py             SQLite schema and all DB functions
+  content_generator.py    Multi-brand content creator
+  content_generator.py    Multi-brand content creator
+  chatbot_server.py       Flask chatbot server (Haiku)
+  chatbot_test.html       Local chatbot test page
+  whatsapp_import.py      Expert community signal importer
+  auditor.py              Content performance tracker
+  transcript_analyzer.py YouTube transcript intelligence
+  thumbnail_analyzer.py  Thumbnail pattern analyzer
+  youtube_scraper.py      YouTube data fetcher
+  migrate.py              One-time v2 → v3 data migration
+  gdrive_backup.py        Google Drive sync and backup
+  schedule_backup.ps1     Windows Task Scheduler setup script
+  config.py               Shared configuration
+  main.py                 Legacy entry point
+  knowledge_base.txt      Himalayan Naturals product catalogue
+  requirements.txt        All Python package dependencies
+  .env                    API keys (NEVER commit to git)
+  .env.example            API key template (safe to share)
+  .gitignore              Git exclusions
+  credentials.json        Google OAuth credentials (NEVER commit)
+  token.json              Google auth token (auto-created, NEVER commit)
+  intelligence.db         SQLite database (all data)
+  intelligence.json       JSON snapshot (backward compat export)
+  memory.json             Legacy memory file (backed up, no longer used)
+
+  output/
+    drafts/               Generated content drafts (text files)
+
+  HOW_TO_USE.txt          This file
+
+
+================================================================================
+  BRAND VOICE CHEAT SHEET
+================================================================================
+
+Global Menopause Collective (GMC):
+  - Authoritative, warm, inclusive
+  - Uses "we" — collective voice
+  - Focus: clinical accuracy + community belonging
+  - Tone: professional but never cold
+
+Endo Neutral:
+  - Philosophical, measured, non-alarmist
+  - Uses "you" — direct but not preachy
+  - Focus: patient agency + systemic advocacy
+  - Tone: thoughtful editorial
+
+Harmanjeet Rekhi (Personal):
+  - Founder voice, insider access
+  - Uses "I" — personal experience
+  - Focus: behind-the-scenes + product stories
+  - Tone: honest, direct, personal
+
+================================================================================
