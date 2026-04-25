@@ -35,11 +35,8 @@ jobs:
       # ── 4. Run intelligence pipeline ─────────────────────────
       - name: Run intelligence pipeline
         env:
-          CLAUDE_API_KEY:         ${{ secrets.CLAUDE_API_KEY }}
-          YOUTUBE_API_KEY:        ${{ secrets.YOUTUBE_API_KEY }}
-          REDDIT_CLIENT_ID:       ${{ secrets.REDDIT_CLIENT_ID }}
-          REDDIT_CLIENT_SECRET:   ${{ secrets.REDDIT_CLIENT_SECRET }}
-          REDDIT_USER_AGENT:      "IntelligenceEngine/3.0"
+          CLAUDE_API_KEY:    ${{ secrets.CLAUDE_API_KEY }}
+          YOUTUBE_API_KEY:   ${{ secrets.YOUTUBE_API_KEY }}
         run: python run_all.py
 
       # ── 5. Generate content drafts ───────────────────────────
