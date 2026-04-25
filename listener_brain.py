@@ -325,9 +325,12 @@ Return ONLY valid JSON, no text before or after:
             temperature=0.7,
             messages=[{"role": "user", "content": prompt}]
         )
-        result = safe_json_parse(response.content[0].text)
+        raw = response.content[0].text
+        result = safe_json_parse(raw)
         if not result:
             print("  [AI] Warning: could not parse JSON from AI response.")
+            print(f"  [AI] Response start: {raw[:300]}")
+            print(f"  [AI] Response end:   {raw[-200:]}")
         return result
 
     except Exception as e:

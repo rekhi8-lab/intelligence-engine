@@ -186,7 +186,6 @@ def main():
     log("Starting full trend engine pipeline...\n")
 
     run_script("listener_brain.py")
-    run_script("main.py")
 
     generate_final_output()
 
@@ -201,8 +200,4 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         print(f"\nFatal error: {e}")
-    finally:
-        try:
-            input("\nPress Enter to exit...")
-        except EOFError:
-            pass
+        sys.exit(1)
