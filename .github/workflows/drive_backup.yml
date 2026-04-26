@@ -45,13 +45,19 @@ jobs:
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: python content_generator.py
 
-      # ── 6. Push updated data + outputs back to Drive ─────────
+      # ── 6. Nervous System — synthesise intelligence into brief ─
+      - name: Run nervous system
+        env:
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        run: python nervous_system.py
+
+      # ── 7. Push updated data + outputs back to Drive ─────────
       - name: Upload results to Google Drive
         env:
           GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
         run: python cloud_sync.py upload
 
-      # ── 7. Summary ───────────────────────────────────────────
+      # ── 8. Summary ───────────────────────────────────────────
       - name: Print run summary
         run: |
           echo "Pipeline complete. New drafts and updated DB uploaded to Drive."

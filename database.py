@@ -159,6 +159,15 @@ def init_schema():
                 used_run_id INTEGER REFERENCES runs(id)
             );
 
+            CREATE TABLE IF NOT EXISTS learning_signals (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                winning_topics TEXT,
+                losing_topics  TEXT,
+                winning_hooks  TEXT,
+                losing_hooks   TEXT,
+                timestamp      DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE INDEX IF NOT EXISTS idx_trending_run    ON trending_topics(run_id);
             CREATE INDEX IF NOT EXISTS idx_keywords_run    ON keywords(run_id);
             CREATE INDEX IF NOT EXISTS idx_signals_run     ON raw_signals(run_id);
