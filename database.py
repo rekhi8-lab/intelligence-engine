@@ -168,6 +168,37 @@ def init_schema():
                 timestamp      DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS tracked_sources (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform    TEXT NOT NULL,
+                source_name TEXT NOT NULL,
+                source_type TEXT,
+                added_on    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_used   DATETIME
+            );
+
+            CREATE TABLE IF NOT EXISTS founder_signals (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_type      TEXT NOT NULL,
+                topic            TEXT,
+                insight          TEXT,
+                emotional_signal TEXT,
+                content_angle    TEXT,
+                raw_content      TEXT,
+                content_hash     TEXT UNIQUE,
+                created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS prompt_log (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                prompt_key TEXT NOT NULL,
+                shown_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_founder_hash   ON founder_signals(content_hash);
+            CREATE INDEX IF NOT EXISTS idx_prompt_key     ON prompt_log(prompt_key);
+            CREATE INDEX IF NOT EXISTS idx_sources_platform ON tracked_sources(platform);
+
             CREATE INDEX IF NOT EXISTS idx_trending_run    ON trending_topics(run_id);
             CREATE INDEX IF NOT EXISTS idx_keywords_run    ON keywords(run_id);
             CREATE INDEX IF NOT EXISTS idx_signals_run     ON raw_signals(run_id);

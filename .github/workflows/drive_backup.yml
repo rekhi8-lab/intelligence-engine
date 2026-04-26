@@ -53,13 +53,23 @@ jobs:
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: python nervous_system.py
 
-      # ── 7. Push updated data + outputs back to Drive ─────────
+      # ── 7. Personal Inbox — process founder curated signals ──
+      - name: Process personal inbox
+        env:
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        run: python personal_inbox_parser.py
+
+      # ── 8. Prompt Engine — check data freshness, write nudges ─
+      - name: Run prompt engine
+        run: python prompt_engine.py
+
+      # ── 9. Push updated data + outputs back to Drive ─────────
       - name: Upload results to Google Drive
         env:
           GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
         run: python cloud_sync.py upload
 
-      # ── 8. Summary ───────────────────────────────────────────
+      # ── 10. Summary ──────────────────────────────────────────
       - name: Print run summary
         run: |
           echo "Pipeline complete. New drafts and updated DB uploaded to Drive."

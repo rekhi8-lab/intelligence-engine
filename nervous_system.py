@@ -182,6 +182,31 @@ def fetch_expert_signals() -> list[str]:
     return [(r["response"] or "")[:300] for r in rows]
 
 
+def fetch_founder_signals() -> list[dict]:
+    """Recent founder signals from personal inbox (last 20)."""
+    conn = db.get_connection()
+    try:
+        rows = conn.execute(
+            """SELECT source_type, topic, insight, emotional_signal, content_angle
+               FROM founder_signals
+               ORDER BY created_at DESC LIMIT 20"""
+        ).fetchall()
+        conn.close()
+        return [
+            {
+                "source_type":      r["source_type"],
+                "topic":            r["topic"] or "",
+                "insight":          r["insight"] or "",
+                "emotional_signal": r["emotional_signal"] or "",
+                "content_angle":    r["content_angle"] or "",
+            }
+            for r in rows
+        ]
+    except Exception:
+        conn.close()
+        return []
+
+
 def fetch_previous_learning() -> dict:
     """Most recent learning signal row for continuity."""
     conn = db.get_connection()
@@ -203,7 +228,8 @@ def fetch_previous_learning() -> dict:
 # STEP 2 — ASSEMBLE CLAUDE INPUT PACKAGE
 # ─────────────────────────────────────────────────────────────
 
-def build_claude_input(intel: dict, perf: dict, expert_signals: list, previous: dict) -> dict:
+def build_claude_input(intel: dict, perf: dict, expert_signals: list,
+                       previous: dict, founder_signals: list) -> dict:
     return {
         "top_performing_topics":  perf.get("top_performing", []),
         "low_performing_topics":  perf.get("low_performing", []),
@@ -214,6 +240,7 @@ def build_claude_input(intel: dict, perf: dict, expert_signals: list, previous: 
         "user_intent_signals":    intel.get("keywords", []),
         "thumbnail_signals":      intel.get("thumbnail_ideas", []),
         "expert_signals":         expert_signals,
+        "founder_signals":        founder_signals,   # personal inbox intelligence
         "previous_learning":      previous,
     }
 
@@ -394,18 +421,20 @@ def run_nervous_system():
     print("  [2/4] Fetching performance data...")
     perf = fetch_performance_data()
 
-    print("  [3/4] Fetching expert signals + previous learning...")
-    expert_signals = fetch_expert_signals()
-    previous       = fetch_previous_learning()
+    print("  [3/4] Fetching expert signals, founder signals + previous learning...")
+    expert_signals   = fetch_expert_signals()
+    founder_signals  = fetch_founder_signals()
+    previous         = fetch_previous_learning()
 
     # ── Step 2: Build Claude input ────────────────────────────
-    claude_input = build_claude_input(intel, perf, expert_signals, previous)
+    claude_input = build_claude_input(intel, perf, expert_signals, previous, founder_signals)
 
     print(f"\n  Input summary:")
     print(f"    Trending topics  : {len(claude_input['current_trends'])}")
     print(f"    Content gaps     : {len(claude_input['content_gaps'])}")
     print(f"    Top performers   : {len(claude_input['top_performing_topics'])}")
     print(f"    Expert signals   : {len(claude_input['expert_signals'])}")
+    print(f"    Founder signals  : {len(claude_input['founder_signals'])}")
     print(f"    Previous learning: {'yes' if previous else 'none yet (first run)'}")
 
     # ── Step 3: Claude synthesis ──────────────────────────────

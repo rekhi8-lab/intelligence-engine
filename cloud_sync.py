@@ -32,10 +32,16 @@ DATA_FILES   = ["intelligence.db", "intelligence.json", "memory.json"]
 # with: python gdrive_backup.py migrate
 # Structure: (local relative path, Drive subfolder under "output/")
 FIXED_OUTPUT_FILES = [
-    ("output/drafts/latest_drafts.txt",      "drafts"),
-    ("output/guidance/latest_brief.txt",     "guidance"),
-    ("output/guidance/latest_brief.json",    "guidance"),
+    ("output/drafts/latest_drafts.txt",               "drafts"),
+    ("output/guidance/latest_brief.txt",              "guidance"),
+    ("output/guidance/latest_brief.json",             "guidance"),
+    ("output/prompts/system_requests.txt",            "prompts"),
+    ("output/prompts/priority.txt",                   "prompts"),
+    ("output/founder_signals/latest_signals.txt",     "founder_signals"),
 ]
+
+# Drive folder name that holds user-supplied input files
+INPUTS_FOLDER = "inputs"
 
 
 # ── auth ──────────────────────────────────────────────────────
@@ -77,6 +83,24 @@ def get_or_create_folder(service, name: str, parent_id: str) -> str:
         return fid
     meta = {"name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parent_id]}
     return service.files().create(body=meta, fields="id").execute()["id"]
+
+
+def download_folder(service, drive_folder_id: str, local_dir: Path):
+    """Recursively download a Drive folder to a local directory."""
+    local_dir.mkdir(parents=True, exist_ok=True)
+    q     = f"'{drive_folder_id}' in parents and trashed=false"
+    items = service.files().list(q=q, fields="files(id,name,mimeType)").execute().get("files", [])
+    count = 0
+    for item in items:
+        if item["mimeType"] == "application/vnd.google-apps.folder":
+            sub_local = local_dir / item["name"]
+            count    += download_folder(service, item["id"], sub_local)
+        else:
+            dest = local_dir / item["name"]
+            download_file(service, item["id"], dest)
+            print(f"  Downloaded input: {dest.relative_to(dest.parents[3] if dest.parents[3].exists() else dest.parent)}")
+            count += 1
+    return count
 
 
 def download_file(service, file_id: str, dest: Path):
@@ -145,6 +169,15 @@ def cmd_download():
             print(f"  Downloaded: {fname}  ({size_kb}KB)")
         else:
             print(f"  [skip] {fname} not in Drive yet")
+
+    # Download inputs/ folder (user-uploaded personal inbox, etc.)
+    inputs_folder_id = find_folder(service, INPUTS_FOLDER, DRIVE_FOLDER_ID)
+    if inputs_folder_id:
+        local_inputs = BASE_DIR / "inputs"
+        n = download_folder(service, inputs_folder_id, local_inputs)
+        print(f"  Downloaded {n} input file(s) from Drive inputs/")
+    else:
+        print("  [skip] No inputs/ folder in Drive yet — upload files to create it")
 
     print("  Download complete.\n")
 
