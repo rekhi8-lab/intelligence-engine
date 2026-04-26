@@ -169,12 +169,28 @@ def init_schema():
             );
 
             CREATE TABLE IF NOT EXISTS tracked_sources (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                platform    TEXT NOT NULL,
-                source_name TEXT NOT NULL,
-                source_type TEXT,
-                added_on    DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_used   DATETIME
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform       TEXT NOT NULL,
+                source_name    TEXT NOT NULL,
+                source_url     TEXT,
+                channel_id     TEXT,
+                source_type    TEXT,
+                added_on       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_used      DATETIME,
+                last_analyzed  DATETIME,
+                notes          TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS channel_analysis (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_id            INTEGER REFERENCES tracked_sources(id),
+                run_date             DATETIME DEFAULT CURRENT_TIMESTAMP,
+                videos_analyzed      INTEGER DEFAULT 0,
+                top_topics           TEXT,
+                top_hooks            TEXT,
+                format_patterns      TEXT,
+                strategic_directions TEXT,
+                raw_json             TEXT
             );
 
             CREATE TABLE IF NOT EXISTS founder_signals (

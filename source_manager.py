@@ -135,25 +135,45 @@ def update_cell(service, sheet_id: str, tab_name: str, row: int, col: int, value
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
 def ensure_schema():
-    """Add any missing columns to tracked_sources (migration for existing DBs)."""
+    """Add missing columns and tables to support channel analysis on old DBs."""
     conn = db.get_connection()
-    existing = {
+
+    # ── tracked_sources column migrations ────────────────────
+    existing_cols = {
         row[1]
         for row in conn.execute("PRAGMA table_info(tracked_sources)").fetchall()
     }
-    migrations = {
+    col_migrations = {
         "source_url":    "ALTER TABLE tracked_sources ADD COLUMN source_url    TEXT",
+        "source_type":   "ALTER TABLE tracked_sources ADD COLUMN source_type   TEXT",
         "channel_id":    "ALTER TABLE tracked_sources ADD COLUMN channel_id    TEXT",
         "last_analyzed": "ALTER TABLE tracked_sources ADD COLUMN last_analyzed DATETIME",
+        "last_used":     "ALTER TABLE tracked_sources ADD COLUMN last_used     DATETIME",
         "notes":         "ALTER TABLE tracked_sources ADD COLUMN notes         TEXT",
     }
-    for col, sql in migrations.items():
-        if col not in existing:
-            try:
-                conn.execute(sql)
-                conn.commit()
-            except Exception:
-                pass
+    with conn:
+        for col, sql in col_migrations.items():
+            if col not in existing_cols:
+                try:
+                    conn.execute(sql)
+                except Exception:
+                    pass
+
+        # ── channel_analysis table (may not exist on old DBs) ─
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS channel_analysis (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_id           INTEGER,
+                run_date            TEXT DEFAULT (date('now')),
+                videos_analyzed     INTEGER DEFAULT 0,
+                top_topics          TEXT,
+                top_hooks           TEXT,
+                format_patterns     TEXT,
+                strategic_directions TEXT,
+                raw_json            TEXT
+            )
+        """)
+
     conn.close()
 
 
