@@ -159,6 +159,35 @@ def is_whatsapp_export(text: str) -> bool:
 
 
 # ─────────────────────────────────────────────────────────────
+# DB MIGRATION
+# ─────────────────────────────────────────────────────────────
+
+def ensure_tracked_sources_schema():
+    """Add any missing columns to tracked_sources (old DBs may be missing them)."""
+    conn = db.get_connection()
+    existing_cols = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(tracked_sources)").fetchall()
+    }
+    migrations = {
+        "source_url":    "ALTER TABLE tracked_sources ADD COLUMN source_url    TEXT",
+        "source_type":   "ALTER TABLE tracked_sources ADD COLUMN source_type   TEXT",
+        "channel_id":    "ALTER TABLE tracked_sources ADD COLUMN channel_id    TEXT",
+        "last_analyzed": "ALTER TABLE tracked_sources ADD COLUMN last_analyzed DATETIME",
+        "last_used":     "ALTER TABLE tracked_sources ADD COLUMN last_used     DATETIME",
+        "notes":         "ALTER TABLE tracked_sources ADD COLUMN notes         TEXT",
+    }
+    with conn:
+        for col, sql in migrations.items():
+            if col not in existing_cols:
+                try:
+                    conn.execute(sql)
+                except Exception:
+                    pass
+    conn.close()
+
+
+# ─────────────────────────────────────────────────────────────
 # DB WRITE HELPERS
 # ─────────────────────────────────────────────────────────────
 
@@ -429,6 +458,7 @@ def run_input_collector():
     print("=" * 62)
 
     db.init_schema()
+    ensure_tracked_sources_schema()
 
     # ── Hard skip (DISPATCH_SKIP=true) ────────────────────────
     if os.environ.get("DISPATCH_SKIP", "").lower() in ("true", "1", "yes"):
