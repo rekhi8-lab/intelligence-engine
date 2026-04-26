@@ -320,6 +320,13 @@ def format_and_save(run_id: int, content: dict, intel: dict) -> Path:
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(report)
 
+    # Also write a fixed-name copy so the cloud service account
+    # can update it (service accounts can UPDATE existing files
+    # but cannot CREATE new files with storage quota)
+    latest_path = OUTPUT_DIR / "latest_drafts.txt"
+    with open(latest_path, "w", encoding="utf-8") as f:
+        f.write(report)
+
     return out_path
 
 

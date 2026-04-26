@@ -24,7 +24,18 @@ SCOPES          = ["https://www.googleapis.com/auth/drive"]
 BASE_DIR        = Path(__file__).parent
 
 DATA_FILES   = ["intelligence.db", "intelligence.json", "memory.json"]
-OUTPUT_DIRS  = ["output"]
+
+# Fixed-name output files the service account can UPDATE each run.
+# Service accounts have no storage quota and cannot CREATE new files
+# in a personal Drive — only update files that already exist (owned
+# by the user's Google account).  Seed these once from the laptop
+# with: python gdrive_backup.py migrate
+# Structure: (local relative path, Drive subfolder under "output/")
+FIXED_OUTPUT_FILES = [
+    ("output/drafts/latest_drafts.txt",      "drafts"),
+    ("output/guidance/latest_brief.txt",     "guidance"),
+    ("output/guidance/latest_brief.json",    "guidance"),
+]
 
 
 # ── auth ──────────────────────────────────────────────────────
@@ -154,11 +165,25 @@ def cmd_upload():
             upload_file(service, fpath, data_folder_id)
             print(f"  Uploaded: {fname}")
 
-    # Upload output folder
-    output_local = BASE_DIR / "output"
-    if output_local.exists():
-        count = upload_folder(service, output_local, output_folder_id)
-        print(f"  Output: {count} files synced")
+    # Upload fixed-name output files only.
+    # Timestamped files (e.g. drafts_run5_2026-04-26...txt) are skipped —
+    # the service account cannot CREATE new files (no storage quota).
+    # Use: python gdrive_backup.py migrate  to seed these files once via
+    # OAuth, then this block updates them every run.
+    synced = 0
+    for rel_path, subfolder_name in FIXED_OUTPUT_FILES:
+        local_path = BASE_DIR / rel_path
+        if not local_path.exists():
+            print(f"  [skip] {rel_path} (not created yet this run)")
+            continue
+        subfolder_id = get_or_create_folder(service, subfolder_name, output_folder_id)
+        try:
+            upload_file(service, local_path, subfolder_id)
+            print(f"  Uploaded: {rel_path}")
+            synced += 1
+        except Exception as e:
+            print(f"  [UPLOAD FAILED] {rel_path}: {e}")
+    print(f"  Output: {synced}/{len(FIXED_OUTPUT_FILES)} fixed files synced")
 
     # Snapshot data/ into backups/<date>/
     today       = datetime.now().strftime("%Y-%m-%d")
