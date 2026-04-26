@@ -39,6 +39,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 BASE_DIR       = Path(__file__).parent
 INBOX_DIR      = BASE_DIR / "inputs" / "whatsapp" / "personal_inbox"
+MANUAL_FILE    = BASE_DIR / "inputs" / "manual" / "insights.txt"
 SIGNALS_DIR    = BASE_DIR / "output" / "founder_signals"
 SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -358,6 +359,32 @@ def write_signals_output(new_signals: list[dict]):
 # MAIN
 # ─────────────────────────────────────────────────────────────
 
+def parse_manual_inputs(file_path: Path) -> list[dict]:
+    """
+    Read plain-text inputs submitted via the nudge UI.
+    Each non-empty line is treated as a URL or text insight.
+    Returns a list of {type, content, context} items.
+    """
+    if not file_path.exists():
+        return []
+    items   = []
+    content = file_path.read_text(encoding="utf-8", errors="replace")
+    # Split on session separators written by nudge_ui.py
+    blocks  = re.split(r"---\s*Submitted.*?---", content, flags=re.DOTALL)
+    for block in blocks:
+        for raw_line in block.splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            urls = URL_RE.findall(line)
+            for url in urls:
+                items.append({"type": "url", "content": url, "context": line})
+            text = URL_RE.sub("", line).strip()
+            if len(text) > 40:
+                items.append({"type": "text", "content": text, "context": line})
+    return items
+
+
 def run_inbox_parser():
     print("\n" + "=" * 62)
     print("  PERSONAL INBOX PARSER — processing founder signals...")
@@ -365,23 +392,32 @@ def run_inbox_parser():
 
     db.init_schema()
 
+    # ── Manual inputs from nudge UI ───────────────────────────
+    manual_items = parse_manual_inputs(MANUAL_FILE)
+    if manual_items:
+        print(f"  [PI] {len(manual_items)} manual input(s) from nudge UI")
+    else:
+        print("  [PI] No manual inputs from nudge UI this cycle")
+
     chat_path = INBOX_DIR / "chat.txt"
-    if not chat_path.exists():
-        print(f"  [PI] No chat.txt found at {chat_path}")
-        print("  [PI] Upload your WhatsApp export to Drive →")
-        print("       inputs → whatsapp → personal_inbox → chat.txt")
+    if not chat_path.exists() and not manual_items:
+        print(f"  [PI] No chat.txt found and no manual inputs.")
+        print("  [PI] Run: python nudge_ui.py  to add inputs.")
         write_signals_output([])
         return
 
-    print(f"  [PI] Parsing {chat_path.name}...")
-    messages = parse_whatsapp_chat(chat_path)
-    print(f"  [PI] {len(messages)} messages found")
+    # ── WhatsApp chat export ──────────────────────────────────
+    all_items = list(manual_items)   # start with manual inputs
 
-    # Collect all classifiable items
-    all_items = []
-    for msg in messages:
-        items = classify_message(msg, INBOX_DIR)
-        all_items.extend(items)
+    if chat_path.exists():
+        print(f"  [PI] Parsing {chat_path.name}...")
+        messages = parse_whatsapp_chat(chat_path)
+        print(f"  [PI] {len(messages)} messages found in chat export")
+        for msg in messages:
+            items = classify_message(msg, INBOX_DIR)
+            all_items.extend(items)
+    else:
+        print("  [PI] No WhatsApp chat export found — processing manual inputs only")
 
     # Deduplicate before calling Claude
     novel_items = []
@@ -435,6 +471,17 @@ def run_inbox_parser():
     print(f"       URLs: {url_count} | Text: {text_count} | Images: {img_count}")
 
     write_signals_output(new_signals)
+
+    # Archive manual inputs so they're not reprocessed next run
+    if MANUAL_FILE.exists() and manual_items:
+        archive = MANUAL_FILE.parent / "insights_processed.txt"
+        existing = archive.read_text(encoding="utf-8") if archive.exists() else ""
+        archive.write_text(
+            existing + MANUAL_FILE.read_text(encoding="utf-8"), encoding="utf-8"
+        )
+        MANUAL_FILE.write_text("", encoding="utf-8")   # clear for next cycle
+        print(f"  [PI] Manual inputs archived and cleared for next cycle")
+
     print("\n  [PI] Inbox parser complete.\n")
 
 

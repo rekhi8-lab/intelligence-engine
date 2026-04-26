@@ -40,6 +40,12 @@ FIXED_OUTPUT_FILES = [
     ("output/founder_signals/latest_signals.txt",     "founder_signals"),
 ]
 
+# Input files that the user writes locally (via nudge_ui.py) and
+# that need to reach the cloud pipeline via Drive
+FIXED_INPUT_FILES = [
+    ("inputs/manual/insights.txt",  "manual"),   # text/links from nudge UI
+]
+
 # Drive folder name that holds user-supplied input files
 INPUTS_FOLDER = "inputs"
 
@@ -217,6 +223,19 @@ def cmd_upload():
         except Exception as e:
             print(f"  [UPLOAD FAILED] {rel_path}: {e}")
     print(f"  Output: {synced}/{len(FIXED_OUTPUT_FILES)} fixed files synced")
+
+    # Upload user-written input files (nudge UI text → Drive → cloud pipeline)
+    inputs_folder_id = get_or_create_folder(service, "inputs", DRIVE_FOLDER_ID)
+    for rel_path, subfolder_name in FIXED_INPUT_FILES:
+        local_path = BASE_DIR / rel_path
+        if not local_path.exists() or local_path.stat().st_size == 0:
+            continue   # nothing to upload (empty or missing)
+        subfolder_id = get_or_create_folder(service, subfolder_name, inputs_folder_id)
+        try:
+            upload_file(service, local_path, subfolder_id)
+            print(f"  Uploaded input: {rel_path}")
+        except Exception as e:
+            print(f"  [UPLOAD FAILED] {rel_path}: {e}")
 
     # Snapshot data/ into backups/<date>/
     today       = datetime.now().strftime("%Y-%m-%d")
