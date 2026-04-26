@@ -411,6 +411,41 @@ def parse_source_rows(rows: list[list[str]], platform: str) -> list[dict]:
     return sources
 
 
+# ── Tab creation helper ───────────────────────────────────────────────────────
+
+def ensure_linked_sources_tab(service, sheet_id: str):
+    """Create the 'Linked Sources' tab if it doesn't exist in the sheet."""
+    try:
+        meta      = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
+        tab_names = [s["properties"]["title"] for s in meta["sheets"]]
+        if "Linked Sources" in tab_names:
+            return
+
+        print("  [SM] Creating missing 'Linked Sources' tab...")
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=sheet_id,
+            body={"requests": [{"addSheet": {"properties": {
+                "title":    "Linked Sources",
+                "tabColor": {"red": 0.96, "green": 0.62, "blue": 0.04},
+            }}}]}
+        ).execute()
+
+        # Write header row
+        service.spreadsheets().values().update(
+            spreadsheetId=sheet_id,
+            range="'Linked Sources'!A1",
+            valueInputOption="RAW",
+            body={"values": [[
+                "Source Name", "URL",
+                "Type (mine/competitor/inspiration)",
+                "Added On", "Status", "Last Checked", "Notes",
+            ]]},
+        ).execute()
+        print("  [SM] 'Linked Sources' tab created.")
+    except Exception as e:
+        print(f"  [SM] Could not create 'Linked Sources' tab: {e}")
+
+
 # ── Main pipeline ─────────────────────────────────────────────────────────────
 
 def run_source_manager():
@@ -433,6 +468,8 @@ def run_source_manager():
     print(f"  Sheet ID: {sheet_id}")
 
     # ── Step 2: Read all source tabs ───────────────────────────────────────
+    ensure_linked_sources_tab(service, sheet_id)
+
     yt_rows = read_tab(service, sheet_id, "YouTube Sources")
     ig_rows = read_tab(service, sheet_id, "Instagram Sources")
     li_rows = read_tab(service, sheet_id, "LinkedIn Sources")
