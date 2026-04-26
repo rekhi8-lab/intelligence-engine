@@ -82,8 +82,12 @@ def upload_file(service, local_path: Path, folder_id: str):
     import mimetypes
     mime, _ = mimetypes.guess_type(str(local_path))
     mime = mime or "application/octet-stream"
-    existing = find_file(service, local_path.name, folder_id)
-    media = MediaFileUpload(str(local_path), mimetype=mime, resumable=True)
+    # Use resumable only for large files (>5MB); small files upload more
+    # reliably without it — avoids silent failures in CI environments
+    size      = local_path.stat().st_size
+    resumable = size > 5 * 1024 * 1024
+    existing  = find_file(service, local_path.name, folder_id)
+    media     = MediaFileUpload(str(local_path), mimetype=mime, resumable=resumable)
     if existing:
         service.files().update(fileId=existing["id"], media_body=media).execute()
     else:
@@ -105,7 +109,7 @@ def upload_folder(service, local_dir: Path, drive_folder_id: str):
                 print(f"  Uploaded: {rel}")
                 count += 1
             except Exception as e:
-                print(f"  [warn] {item.name}: {e}")
+                print(f"  [UPLOAD FAILED] {rel}: {e}")
     return count
 
 
