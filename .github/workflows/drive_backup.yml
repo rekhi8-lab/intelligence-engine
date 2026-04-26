@@ -4,7 +4,28 @@ on:
   schedule:
     # 02:00 UTC on odd days (1st, 3rd, 5th...)
     - cron: "0 2 */2 * *"
-  workflow_dispatch:   # manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      youtube_channel:
+        description: "New YouTube channel — Name | URL | mine / competitor / inspiration"
+        required: false
+        default: ""
+      instagram_handle:
+        description: "New Instagram handle — Name | @handle_or_URL | mine / competitor / inspiration"
+        required: false
+        default: ""
+      linked_source:
+        description: "New linked source/website — Name | URL | mine / competitor / inspiration"
+        required: false
+        default: ""
+      insight:
+        description: "Quick insight, note, or article summary for this run"
+        required: false
+        default: ""
+      skip_inputs:
+        description: "Skip input collection entirely and run immediately?"
+        type: boolean
+        default: false
 
 jobs:
   run-pipeline:
@@ -34,42 +55,65 @@ jobs:
           GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
         run: python cloud_sync.py download
 
-      # ── 4. Run intelligence pipeline ─────────────────────────
+      # ── 4. Collect run inputs (Telegram + dispatch form) ────
+      - name: Collect run inputs
+        env:
+          TELEGRAM_BOT_TOKEN:          ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:            ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISPATCH_YOUTUBE:            ${{ github.event.inputs.youtube_channel }}
+          DISPATCH_INSTAGRAM:          ${{ github.event.inputs.instagram_handle }}
+          DISPATCH_LINK:               ${{ github.event.inputs.linked_source }}
+          DISPATCH_INSIGHT:            ${{ github.event.inputs.insight }}
+          DISPATCH_SKIP:               ${{ github.event.inputs.skip_inputs }}
+          GITHUB_EVENT_NAME:           ${{ github.event_name }}
+          INPUT_TIMEOUT_SECS:          "300"
+        run: python run_input_collector.py
+
+      # ── 5. Run intelligence pipeline ─────────────────────────
       - name: Run intelligence pipeline
         env:
           CLAUDE_API_KEY:    ${{ secrets.CLAUDE_API_KEY }}
           YOUTUBE_API_KEY:   ${{ secrets.YOUTUBE_API_KEY }}
         run: python run_all.py
 
-      # ── 5. Generate content drafts ───────────────────────────
+      # ── 6. Generate content drafts ───────────────────────────
       - name: Generate content drafts
         env:
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: python content_generator.py
 
-      # ── 6. Nervous System — synthesise intelligence into brief ─
+      # ── 7. Nervous System — synthesise intelligence into brief ─
       - name: Run nervous system
         env:
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: python nervous_system.py
 
-      # ── 7. Personal Inbox — process founder curated signals ──
+      # ── 7. Source Manager — sync sheet sources, analyse channels ─
+      - name: Run source manager
+        env:
+          CLAUDE_API_KEY:              ${{ secrets.CLAUDE_API_KEY }}
+          YOUTUBE_API_KEY:             ${{ secrets.YOUTUBE_API_KEY }}
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          SOURCES_SHEET_ID:            ${{ secrets.SOURCES_SHEET_ID }}
+        run: python source_manager.py
+
+      # ── 8. Personal Inbox — process founder curated signals ──
       - name: Process personal inbox
         env:
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: python personal_inbox_parser.py
 
-      # ── 8. Prompt Engine — check data freshness, write nudges ─
+      # ── 9. Prompt Engine — check data freshness, write nudges ─
       - name: Run prompt engine
         run: python prompt_engine.py
 
-      # ── 9. Push updated data + outputs back to Drive ─────────
+      # ── 10. Push updated data + outputs back to Drive ────────
       - name: Upload results to Google Drive
         env:
           GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
         run: python cloud_sync.py upload
 
-      # ── 10. Summary ──────────────────────────────────────────
+      # ── 11. Summary ──────────────────────────────────────────
       - name: Print run summary
         run: |
           echo "Pipeline complete. New drafts and updated DB uploaded to Drive."
