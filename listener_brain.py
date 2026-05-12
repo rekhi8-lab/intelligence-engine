@@ -11,6 +11,7 @@ import anthropic
 
 import query_engine as qe
 import database as db
+from social_scraper import evolve_queries_from_intelligence, get_all_social_signals
 
 db.init_schema()
 
@@ -222,16 +223,26 @@ def build_data_sample(data: list[dict], n: int = 30) -> list[dict]:
 # JSON PARSER
 # ─────────────────────────────────────────────────────────────
 
-def safe_json_parse(text: str) -> dict:
+def _safe_json_parse(text: str) -> dict:
+    import re
+
+    # Strip markdown code fences
+    text = text.strip()
+    text = re.sub(r"^```json\s*", "", text)
+    text = re.sub(r"^```\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    text = text.strip()
     try:
         return json.loads(text)
     except Exception:
         try:
             start = text.find("{")
-            end   = text.rfind("}") + 1
-            return json.loads(text[start:end])
+            end = text.rfind("}") + 1
+            if start >= 0 and end > start:
+                return json.loads(text[start:end])
         except Exception:
-            return {}
+            pass
+        return {}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -326,7 +337,7 @@ Return ONLY valid JSON, no text before or after:
             messages=[{"role": "user", "content": prompt}]
         )
         raw = response.content[0].text
-        result = safe_json_parse(raw)
+        result = _safe_json_parse(raw)
         if not result:
             print("  [AI] Warning: could not parse JSON from AI response.")
             print(f"  [AI] Response start: {raw[:300]}")
@@ -379,14 +390,17 @@ def run_listener():
     print()
 
     # ── Collect from all sources ──────────────────────────────
-    print("  [1/3] Reddit...")
+    print("  [1/5] Reddit...")
     reddit_data = get_reddit_data()
 
-    print("  [2/3] YouTube (evolved queries)...")
+    print("  [2/5] YouTube (evolved queries)...")
     youtube_data = get_youtube_data(yt_queries)
 
-    print("  [3/3] Google Trends...")
+    print("  [3/5] Google Trends...")
     trends_data = get_google_trends_data()
+
+    print("  [4/5] Instagram + LinkedIn (via Google)...")
+    social_data = get_all_social_signals()
 
     # ── WhatsApp expert signals (highest priority) ────────────
     wa_pending = db.get_pending_whatsapp_signals()
@@ -397,7 +411,7 @@ def run_listener():
     if wa_data:
         print(f"  [+] {len(wa_data)} WhatsApp expert signal(s) included")
 
-    combined = wa_data + reddit_data + youtube_data + trends_data
+    combined = wa_data + reddit_data + youtube_data + trends_data + social_data
 
     # Source breakdown
     source_counts: dict[str, int] = {}
@@ -435,6 +449,8 @@ def run_listener():
         "reddit":        len(reddit_data),
         "youtube":       len(youtube_data),
         "google_trends": len(trends_data),
+        "instagram":     len([s for s in social_data if "instagram" in s.get("source", "")]),
+        "linkedin":      len([s for s in social_data if "linkedin" in s.get("source", "")]),
         "total":         len(combined)
     }
     data_sample = build_data_sample(combined, n=40)
@@ -460,6 +476,9 @@ def run_listener():
         },
         "data_sample": data_sample
     }
+
+    evolved_social = evolve_queries_from_intelligence(ai_output)
+    intelligence["evolved_social_queries"] = evolved_social
 
     with open("intelligence.json", "w", encoding="utf-8") as f:
         json.dump(intelligence, f, indent=2, ensure_ascii=False)
