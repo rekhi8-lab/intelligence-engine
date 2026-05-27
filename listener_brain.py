@@ -165,16 +165,28 @@ def get_youtube_data(queries: list[str]):
 def get_google_trends_data():
     try:
         from pytrends.request import TrendReq
-        pytrends = TrendReq(hl="en-US", tz=0)
+        import time as _time
 
         batches = [
-            ["menopause", "perimenopause", "PCOS", "endometriosis", "ADHD women"],
-            ["hormonal imbalance", "early puberty girls", "HRT menopause", "brain fog menopause", "hot flashes"]
+            ["menopause", "perimenopause", "PCOS",
+             "endometriosis", "ADHD women"],
+            ["hormonal imbalance", "early puberty girls",
+             "HRT menopause", "brain fog menopause",
+             "hot flashes"]
         ]
         data = []
-        for batch in batches:
+        for i, batch in enumerate(batches):
             try:
-                pytrends.build_payload(batch, timeframe="now 7-d", geo="")
+                # Fresh instance per batch + pre-request delay
+                if i > 0:
+                    _time.sleep(15)  # 15s between batches
+                pytrends = TrendReq(
+                    hl="en-US", tz=0,
+                    timeout=(10, 25),
+                )
+                pytrends.build_payload(
+                    batch, timeframe="now 7-d", geo=""
+                )
                 related = pytrends.related_queries()
                 for kw, results in related.items():
                     if not results:
@@ -183,25 +195,30 @@ def get_google_trends_data():
                         df = results.get(kind)
                         if df is not None and not df.empty:
                             for _, row in df.head(5).iterrows():
-                                data.append({"source": f"google_trends_{kind}", "text": row["query"], "signal": 2})
-                time.sleep(3)
+                                data.append({
+                                    "source": f"google_trends_{kind}",
+                                    "text": row["query"],
+                                    "signal": 2
+                                })
             except Exception as e:
-                print(f"    [Trends batch] {e}")
+                err = str(e)
+                if "429" in err or "Too Many Requests" in err:
+                    print(f"    [Trends batch {i+1}] Rate limited — skipping (retry next run)")
+                else:
+                    print(f"    [Trends batch {i+1}] {e}")
+                _time.sleep(30)  # back off hard on any error
 
         print(f"        {len(data)} points from Google Trends")
         return data
 
     except ImportError:
-        print("        [Trends] pytrends not installed (pip install pytrends)")
+        print("        [Trends] pytrends not installed")
         return []
     except Exception as e:
         print(f"        [Trends] {e}")
         return []
 
 
-# ─────────────────────────────────────────────────────────────
-# DATA SAMPLE — preserve top raw signals in intelligence.json
-# ─────────────────────────────────────────────────────────────
 
 def build_data_sample(data: list[dict], n: int = 30) -> list[dict]:
     """
