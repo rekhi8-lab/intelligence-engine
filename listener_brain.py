@@ -322,7 +322,7 @@ SIGNAL PRIORITY ORDER:
 {data_block}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Produce a complete intelligence report with ALL 12 fields. Be specific, data-driven, psychologically deep. No generic advice.
+Produce a complete intelligence report with ALL 13 fields. Be specific, data-driven, psychologically deep. No generic advice.
 
 FIELD SPECIFICATIONS:
 
@@ -332,29 +332,32 @@ FIELD SPECIFICATIONS:
 
 3. content_gaps (3 items): Topics heavily discussed in comments/Reddit but barely covered on YouTube. State the specific gap and the emotional frustration driving it.
 
-4. thumbnail_patterns (5 items): Visual/emotional thumbnail patterns inferred from titles and emotional language. E.g. "split-face before/after emotional state", "confrontational direct eye contact with bold symptom text".
+4. dominant_emotion (string): The single most prevalent emotional state driving the audience right now. Must be ONE word or short phrase from this list: seeking-answers, frustrated, hopeful, anxious, validated, isolated, empowered, grieving, curious, overwhelmed. Choose the one that best describes the dominant feeling in the scraped signals.
 
-5. thumbnail_text_ideas (10 items): 3–6 word high-conversion phrases. Curiosity-driven, emotionally triggering, topic-specific. Examples: "They Called It Anxiety", "My Doctor Was Wrong", "Nobody Warned Me This".
+5. thumbnail_patterns (5 items): Visual/emotional thumbnail patterns inferred from titles and emotional language. E.g. "split-face before/after emotional state", "confrontational direct eye contact with bold symptom text".
 
-6. youtube_titles (10 items): Title formulas using emotional triggers + keyword clusters. Formats: "X Things...", "Why Your Doctor...", "I Finally Found Out...", "The Real Reason...", "Nobody Talks About..."
+6. thumbnail_text_ideas (10 items): 3–6 word high-conversion phrases. Curiosity-driven, emotionally triggering, topic-specific. Examples: "They Called It Anxiety", "My Doctor Was Wrong", "Nobody Warned Me This".
 
-7. content_series_ideas (3 items): Multi-video series with a name and 2–3 sentence pitch.
+7. youtube_titles (10 items): Title formulas using emotional triggers + keyword clusters. Formats: "X Things...", "Why Your Doctor...", "I Finally Found Out...", "The Real Reason...", "Nobody Talks About..."
 
-8. posting_frequency_model (string): Cadence, topic rotation, format mix (shorts/long-form/series).
+8. content_series_ideas (3 items): Multi-video series with a name and 2–3 sentence pitch.
 
-9. multi_channel_strategy (string): YouTube + Instagram + Facebook Groups + email + community funneling.
+9. posting_frequency_model (string): Cadence, topic rotation, format mix (shorts/long-form/series).
 
-10. audience_funnel_strategy (string): Cold → subscriber → engaged community → buyer journey with specific content for each stage.
+10. multi_channel_strategy (string): YouTube + Instagram + Facebook Groups + email + community funneling.
 
-11. memory_keywords (20 items): Most important recurring terms from this dataset for longitudinal tracking.
+11. audience_funnel_strategy (string): Cold → subscriber → engaged community → buyer journey with specific content for each stage.
 
-12. next_search_queries (15 items): Deeper, more specific search queries for the next data collection cycle — based on what you found in this data. Should go further into sub-niches and emotional language discovered here.
+12. memory_keywords (20 items): Most important recurring terms from this dataset for longitudinal tracking.
+
+13. next_search_queries (15 items): Deeper, more specific search queries for the next data collection cycle — based on what you found in this data. Should go further into sub-niches and emotional language discovered here.
 
 Return ONLY valid JSON, no text before or after:
 {{
   "trending_topics": [],
   "expanded_keywords": [],
   "content_gaps": [],
+  "dominant_emotion": "",
   "thumbnail_patterns": [],
   "thumbnail_text_ideas": [],
   "youtube_titles": [],
@@ -440,7 +443,33 @@ def run_listener():
     trends_data = get_google_trends_data()
 
     print("  [4/5] Instagram + LinkedIn (via Google)...")
-    social_data = get_all_social_signals()
+    # Load owner-added manual keywords for social search
+    _manual_kws = _load_manual_keywords()
+    _reddit_queries = (
+        [f"site:reddit.com/r/Menopause {kw}"
+         for kw in _manual_kws]
+        if _manual_kws else None
+    )
+    _ig_queries = (
+        [f"site:instagram.com {kw}"
+         for kw in _manual_kws]
+        if _manual_kws else None
+    )
+    _li_queries = (
+        [f"site:linkedin.com {kw}"
+         for kw in _manual_kws]
+        if _manual_kws else None
+    )
+    social_data = get_all_social_signals(
+        ig_queries=_ig_queries,
+        li_queries=_li_queries,
+        reddit_queries=_reddit_queries,
+    )
+    if _manual_kws:
+        print(
+            f"[listener] Injected {len(_manual_kws)} "
+            f"manual keywords into social signals"
+        )
 
     # ── WhatsApp expert signals (highest priority) ────────────
     wa_pending = db.get_pending_whatsapp_signals()
@@ -507,6 +536,9 @@ def run_listener():
         "timestamp": str(datetime.now()),
         "engine_version": "3.0",
         **ai_output,
+        "dominant_emotion": ai_output.get(
+            "dominant_emotion", "not analysed"
+        ),
         "data_sources": data_sources,
         "query_pool": {
             "run":          pool["run_count"],
