@@ -8,7 +8,7 @@ searching Google with site: operators. This avoids:
   - Violating ToS (we only read what Google has already indexed)
 
 Output format matches listener_brain.py signal schema:
-  {"source": "instagram_google" | "linkedin_google", "text": "...", "signal": N}
+  {"source": "instagram_google" | "linkedin_google" | "reddit_google", "text": "...", "signal": N}
 
 Add to listener_brain.py's collection pipeline or run standalone.
 """
@@ -72,6 +72,28 @@ LINKEDIN_QUERIES = [
     "site:linkedin.com ayurveda wellness",
     "site:linkedin.com women health founder",
 ]
+
+REDDIT_SUBREDDITS = [
+    "Menopause",
+    "PCOS",
+    "Perimenopause",
+    "TwoXChromosomes",
+    "WomensHealth",
+]
+
+REDDIT_KEYWORDS = [
+    "menopause symptoms",
+    "perimenopause brain fog",
+    "HRT experience",
+    "menopause anxiety",
+    "hot flashes",
+    "surgical menopause",
+    "menopause weight gain",
+    "endometriosis pain",
+    "PCOS diagnosis",
+]
+
+MAX_REDDIT_SIGNALS = 50
 
 
 # ─────────────────────────────────────────────────────────────
@@ -260,6 +282,54 @@ def get_linkedin_signals(custom_queries: list[str] | None = None) -> list[dict[s
     print(f"        {len(all_signals)} points from LinkedIn (via Google)")
     return all_signals
 
+def get_reddit_google_signals(custom_queries: list[str] | None = None) -> list[dict[str, Any]]:
+    """
+    Collect Reddit trend signals via Google site:reddit.com/r/... search.
+
+    Returns list of signal dicts compatible with listener_brain.py format.
+    """
+    if custom_queries:
+        queries = custom_queries
+    else:
+        queries = [
+            f"site:reddit.com/r/{REDDIT_SUBREDDITS[i % len(REDDIT_SUBREDDITS)]} {kw}"
+            for i, kw in enumerate(REDDIT_KEYWORDS)
+        ]
+
+    if not SERPER_API_KEY and not GOOGLE_CSE_API_KEY:
+        _load_keys()
+    if not SERPER_API_KEY and not (GOOGLE_CSE_API_KEY and GOOGLE_CSE_CX):
+        print("        [Reddit] No search backend configured — skipping")
+        return []
+
+    all_signals: list[dict[str, Any]] = []
+    seen_texts: set[str] = set()
+
+    for query in queries:
+        if len(all_signals) >= MAX_REDDIT_SIGNALS:
+            break
+
+        results = _search(query, num=5)
+        for r in results:
+            if len(all_signals) >= MAX_REDDIT_SIGNALS:
+                break
+
+            for raw in (r.get("snippet", ""), r.get("title", "")):
+                text_val = _clean_snippet(raw.strip()) if raw else ""
+                if not text_val or len(text_val) < 20 or text_val in seen_texts:
+                    continue
+                seen_texts.add(text_val)
+                all_signals.append({
+                    "source": "reddit_google",
+                    "text": text_val[:300],
+                    "signal": 3,
+                })
+
+        time.sleep(1.5)
+
+    print(f"        {len(all_signals)} points from Reddit (via Google)")
+    return all_signals
+
 
 # ─────────────────────────────────────────────────────────────
 # INTEGRATION HELPER — drop-in for listener_brain.py
@@ -268,9 +338,10 @@ def get_linkedin_signals(custom_queries: list[str] | None = None) -> list[dict[s
 def get_all_social_signals(
     ig_queries: list[str] | None = None,
     li_queries: list[str] | None = None,
+    reddit_queries: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Collect from both platforms. Returns combined signal list.
+    Collect from Instagram, LinkedIn, and Reddit. Returns combined signal list.
 
     Usage in listener_brain.py run_listener():
         from social_scraper import get_all_social_signals
@@ -279,7 +350,8 @@ def get_all_social_signals(
     """
     ig = get_instagram_signals(ig_queries)
     li = get_linkedin_signals(li_queries)
-    return ig + li
+    reddit = get_reddit_google_signals(reddit_queries)
+    return ig + li + reddit
 
 
 # ─────────────────────────────────────────────────────────────
@@ -288,10 +360,10 @@ def get_all_social_signals(
 
 def evolve_queries_from_intelligence(intel: dict[str, Any]) -> dict[str, list[str]]:
     """
-    Given an intelligence.json dict, generate smarter IG/LinkedIn queries
+    Given an intelligence.json dict, generate smarter IG/LinkedIn/Reddit queries
     for the next collection cycle based on trending topics and keywords.
 
-    Returns {"instagram": [...], "linkedin": [...]}.
+    Returns {"ig": [...], "li": [...], "reddit": [...]}.
     """
     topics = intel.get("trending_topics", [])[:5]
     keywords = intel.get("expanded_keywords", [])[:8]
@@ -299,12 +371,15 @@ def evolve_queries_from_intelligence(intel: dict[str, Any]) -> dict[str, list[st
 
     ig_evolved = []
     li_evolved = []
+    reddit_evolved = []
 
     for topic in topics:
         # Clean topic for search query
         clean = topic.replace('"', "").strip()[:60]
         ig_evolved.append(f"site:instagram.com {clean}")
         li_evolved.append(f"site:linkedin.com {clean}")
+        reddit_clean = topic.strip().lower()[:60]
+        reddit_evolved.append(f"site:reddit.com/r/Menopause {reddit_clean}")
 
     for kw in keywords[:5]:
         clean = kw.replace('"', "").strip()[:50]
@@ -317,8 +392,9 @@ def evolve_queries_from_intelligence(intel: dict[str, Any]) -> dict[str, list[st
         ig_evolved.append(f"site:instagram.com {clean}")
 
     return {
-        "instagram": ig_evolved[:10],
-        "linkedin": li_evolved[:10],
+        "ig": ig_evolved[:10],
+        "li": li_evolved[:10],
+        "reddit": reddit_evolved[:10],
     }
 
 
