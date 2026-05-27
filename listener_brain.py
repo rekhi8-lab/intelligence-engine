@@ -5,6 +5,7 @@ import json
 import time
 import requests
 from datetime import datetime
+from pathlib import Path
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 import anthropic
@@ -14,6 +15,21 @@ import database as db
 from social_scraper import evolve_queries_from_intelligence, get_all_social_signals
 
 db.init_schema()
+
+BASE_DIR = Path(__file__).parent
+
+
+def _load_manual_keywords() -> list[str]:
+    """Load owner-added keywords from inputs/manual/keywords.txt"""
+    kw_path = BASE_DIR / "inputs" / "manual" / "keywords.txt"
+    if not kw_path.is_file():
+        return []
+    lines = kw_path.read_text(encoding="utf-8").splitlines()
+    kws = [l.strip() for l in lines if l.strip() and not l.startswith("#")]
+    if kws:
+        print(f"[listener] Loaded {len(kws)} manual keywords")
+    return kws
+
 
 # ─────────────────────────────────────────────────────────────
 # CREDENTIALS
@@ -47,6 +63,10 @@ REDDIT_SUBS = [
     "r/ADHD_Anxiety",
     "r/WomensHealth"
 ]
+
+_manual_kws = _load_manual_keywords()
+if _manual_kws:
+    REDDIT_QUERIES = list(dict.fromkeys(REDDIT_QUERIES + _manual_kws))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -403,6 +423,9 @@ def run_listener():
     # ── Load query pool (self-evolving) ───────────────────────
     pool = qe.load_pool()
     yt_queries = qe.select_queries(pool, n=12)
+    _manual_kws = _load_manual_keywords()
+    if _manual_kws:
+        yt_queries = list(dict.fromkeys(yt_queries + _manual_kws))
     qe.print_pool_status(pool)
     print()
 

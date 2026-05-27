@@ -501,7 +501,12 @@ def run_input_collector():
     print(f"  [TG] Prompt sent to chat {CHAT_ID}.")
     print(f"  [TG] Waiting up to {minutes}m {secs_rem}s for inputs...")
 
-    result = poll_telegram(TIMEOUT_SECS)
+    _WINDOW_FLAG = Path("/tmp/intelligence_window_active")
+    try:
+        _WINDOW_FLAG.touch()
+        result = poll_telegram(TIMEOUT_SECS)
+    finally:
+        _WINDOW_FLAG.unlink(missing_ok=True)
 
     total = len(dispatch_items) + len(result["added"])
 
