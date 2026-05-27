@@ -290,57 +290,55 @@ HELP_TEXT = (
 
 def dispatch(text: str) -> str | None:
     """
-    Process a single text command.
-    Returns a reply string, '__DONE__' to end the window, or None to ignore.
+    Route a Telegram message during the scheduled window.
+    /done|/skip|/proceed end the window immediately.
+    All other commands delegated to input_handlers.
     """
-    text  = text.strip()
-    lower = text.lower()
+    lower = text.strip().lower()
 
-    # ── Terminal signals ──────────────────────────────────────
-    if lower in ("/done", "done", "/skip", "skip", "/proceed", "proceed"):
+    if lower in ("/done", "/skip", "/proceed", "done", "skip"):
         return "__DONE__"
 
-    if lower in ("/help", "help", "?"):
-        return HELP_TEXT
+    try:
+        # Repo A path — not in systemd env; hardcoded for GitHub Actions + VM
+        _AW_DIR = "/home/Acer/automation-working-folder"
+        if _AW_DIR not in sys.path:
+            sys.path.insert(0, _AW_DIR)
+        from input_handlers import handle_command
+        return handle_command(text.strip())
+    except ImportError:
+        return _legacy_dispatch(text.strip())
 
-    # ── YouTube ───────────────────────────────────────────────
+
+def _legacy_dispatch(text: str) -> str | None:
+    """Fallback if input_handlers unavailable."""
+    lower = text.strip().lower()
     if re.match(r"^/?youtube\b", lower):
-        raw  = re.sub(r"^/?youtube\s*", "", text, flags=re.IGNORECASE).strip()
-        if not raw:
-            return "Format: /youtube Name | URL | mine/competitor/inspiration"
-        name, url, stype = parse_pipe(raw)
-        is_new = add_source("youtube", name, url, stype)
-        return f"✅ {'Added' if is_new else 'Updated'} YouTube: <b>{name or url}</b> [{stype}]"
-
-    # ── Instagram ─────────────────────────────────────────────
+        raw = re.sub(r"^/?youtube\s*", "", text, flags=re.IGNORECASE).strip()
+        if raw:
+            n, u, t = parse_pipe(raw)
+            add_source("youtube", n, u, t)
+            return f"✅ YouTube added: {n or u}"
     if re.match(r"^/?instagram\b", lower):
-        raw  = re.sub(r"^/?instagram\s*", "", text, flags=re.IGNORECASE).strip()
-        if not raw:
-            return "Format: /instagram Name | @handle | mine/competitor/inspiration"
-        name, url, stype = parse_pipe(raw)
-        is_new = add_source("instagram", name, url, stype)
-        return f"✅ {'Added' if is_new else 'Updated'} Instagram: <b>{name or url}</b> [{stype}]"
-
-    # ── Linked source ─────────────────────────────────────────
+        raw = re.sub(r"^/?instagram\s*", "", text, flags=re.IGNORECASE).strip()
+        if raw:
+            n, u, t = parse_pipe(raw)
+            add_source("instagram", n, u, t)
+            return f"✅ Instagram added: {n or u}"
     if re.match(r"^/?link\b", lower):
-        raw  = re.sub(r"^/?link\s*", "", text, flags=re.IGNORECASE).strip()
-        if not raw:
-            return "Format: /link Name | URL | mine/competitor/inspiration"
-        name, url, stype = parse_pipe(raw)
-        is_new = add_source("web", name, url, stype)
-        return f"✅ {'Added' if is_new else 'Updated'} Link: <b>{name or url}</b> [{stype}]"
-
-    # ── Text insight ──────────────────────────────────────────
+        raw = re.sub(r"^/?link\s*", "", text, flags=re.IGNORECASE).strip()
+        if raw:
+            n, u, t = parse_pipe(raw)
+            add_source("web", n, u, t)
+            return f"✅ Link added: {n or u}"
     if re.match(r"^/?insight\b", lower):
         raw = re.sub(r"^/?insight\s*", "", text, flags=re.IGNORECASE).strip()
-        if not raw:
-            return "Format: /insight Your text here"
-        add_insight(raw)
-        preview = raw[:80] + ("…" if len(raw) > 80 else "")
-        return f"✅ Insight saved: <i>{preview}</i>"
-
-    return None  # unrecognised — ignore silently
-
+        if raw:
+            add_insight(raw)
+            return "✅ Insight saved"
+    if lower in ("/help", "help", "?"):
+        return HELP_TEXT
+    return None
 
 # ─────────────────────────────────────────────────────────────
 # TELEGRAM POLL LOOP
