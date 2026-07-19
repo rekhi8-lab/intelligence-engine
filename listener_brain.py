@@ -172,10 +172,7 @@ def build_data_sample(data: list[dict], n: int = 30) -> list[dict]:
     for item in ranked[:n]:
         sample.append({
             "source": item["source"],
-            "text":   item["text"][:300],
-            "signal": item.get("signal", 0),
-            "link":   item.get("link") or item.get("url", ""),
-            "likes":  item.get("likes", 0)
+            "text":   item["text"][:300]
         })
     return sample
 
@@ -250,7 +247,11 @@ Produce a complete intelligence report with ALL 9 fields. Be specific, data-driv
 
 FIELD SPECIFICATIONS:
 
-1. trending_topics (10 items): Most repeated + emotionally charged topics. Be specific — not "menopause" but "perimenopause heart palpitations misdiagnosed as panic disorder".
+1. trending_topics (10 items): Most repeated + emotionally charged topics. Return as a list of dicts, ranked by score descending. Each dict must have exactly these fields:
+   - "key": the specific topic phrase (e.g. "perimenopause heart palpitations misdiagnosed as panic disorder")
+   - "score": float 0.0–1.0 reflecting signal weight (volume + emotional intensity + recurrence)
+   - "sources": int, number of raw signals (comments, posts, titles) that mention this topic
+   - "sample": short verbatim quote from the raw data that best represents this topic (max 120 chars)
 
 2. expanded_keywords (25–30 items): Long-tail pain keywords, question-based keywords, symptom combinations, underserved niche sub-topics. Examples: "why does my ADHD get worse before my period", "perimenopause brain fog affects my job performance".
 
@@ -270,7 +271,7 @@ FIELD SPECIFICATIONS:
 
 Return ONLY valid JSON, no text before or after:
 {{
-  "trending_topics": [],
+  "trending_topics": [{"key": "", "score": 0.0, "sources": 0, "sample": ""}],
   "expanded_keywords": [],
   "content_gaps": [],
   "dominant_emotion": "",
@@ -294,6 +295,15 @@ Return ONLY valid JSON, no text before or after:
             print("  [AI] Warning: could not parse JSON from AI response.")
             print(f"  [AI] Response start: {raw[:300]}")
             print(f"  [AI] Response end:   {raw[-200:]}")
+        # Normalise trending_topics: coerce plain strings to scored dicts
+        raw_tt = result.get("trending_topics", [])
+        normed = []
+        for item in raw_tt:
+            if isinstance(item, dict):
+                normed.append(item)
+            elif isinstance(item, str):
+                normed.append({"key": item, "score": 0.5, "sources": 1, "sample": ""})
+        result["trending_topics"] = normed
         return result
 
     except Exception as e:
