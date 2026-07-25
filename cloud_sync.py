@@ -13,7 +13,7 @@ import sys
 import json
 import io
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -70,7 +70,7 @@ def get_service():
 
 def find_file(service, name: str, parent_id: str) -> dict | None:
     q = f"name='{name}' and '{parent_id}' in parents and trashed=false"
-    r = service.files().list(q=q, fields="files(id,name,size)").execute()
+    r = service.files().list(q=q, fields="files(id,name,size,modifiedTime)").execute()
     files = r.get("files", [])
     return files[0] if files else None
 
@@ -166,6 +166,9 @@ def cmd_download():
         print("  [!] data/ folder not in Drive. First run — starting fresh.")
         return
 
+    _FRESH_FLAG = BASE_DIR / "intelligence_fresh.flag"
+    intel_mod_time = None
+
     for fname in DATA_FILES:
         f = find_file(service, fname, data_folder_id)
         if f:
@@ -173,8 +176,22 @@ def cmd_download():
             download_file(service, f["id"], dest)
             size_kb = int(f.get("size", 0)) // 1024
             print(f"  Downloaded: {fname}  ({size_kb}KB)")
+            if fname == "intelligence.json":
+                intel_mod_time = f.get("modifiedTime")
         else:
             print(f"  [skip] {fname} not in Drive yet")
+
+    if intel_mod_time:
+        mod_dt = datetime.fromisoformat(intel_mod_time.replace("Z", "+00:00"))
+        age_h = (datetime.now(timezone.utc) - mod_dt).total_seconds() / 3600
+        if age_h < 20:
+            _FRESH_FLAG.write_text(intel_mod_time)
+            print(f"  [fresh] intelligence.json {age_h:.1f}h old — skipping listener_brain.py collection")
+        else:
+            _FRESH_FLAG.unlink(missing_ok=True)
+            print(f"  [stale] intelligence.json {age_h:.1f}h old — will re-collect")
+    else:
+        _FRESH_FLAG.unlink(missing_ok=True)
 
     # Download inputs/ folder (user-uploaded personal inbox, etc.)
     inputs_folder_id = find_folder(service, INPUTS_FOLDER, DRIVE_FOLDER_ID)

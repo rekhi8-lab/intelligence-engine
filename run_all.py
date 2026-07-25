@@ -185,7 +185,13 @@ def generate_final_output():
 def main():
     log("Starting full trend engine pipeline...\n")
 
-    run_script("listener_brain.py")
+    fresh_flag = BASE_DIR / "intelligence_fresh.flag"
+    if fresh_flag.exists():
+        mod_time = fresh_flag.read_text().strip()
+        log(f"[skip] intelligence.json fresh from Drive (VM data, {mod_time}) — skipping collection")
+        fresh_flag.unlink(missing_ok=True)
+    else:
+        run_script("listener_brain.py")
 
     generate_final_output()
 
