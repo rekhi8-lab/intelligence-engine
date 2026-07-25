@@ -180,7 +180,7 @@ def evolve_pool(pool: dict, ai_output: dict, used_queries: list[str]) -> dict:
     # Build relevance signals from AI output
     trending_words = set()
     for t in ai_output.get("trending_topics", []):
-        trending_words.update(t.lower().split())
+        trending_words.update((t["key"] if isinstance(t, dict) else t).lower().split())
 
     keyword_words = set()
     for k in ai_output.get("expanded_keywords", []):
