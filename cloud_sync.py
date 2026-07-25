@@ -274,12 +274,43 @@ def cmd_upload():
 
 # ── main ──────────────────────────────────────────────────────
 
+
+def cmd_vm_push():
+    """Push intelligence data files from VM to Drive after a successful listener_brain run."""
+    print("=== CLOUD SYNC: VM PUSH ===")
+
+    key_file = Path(os.environ.get("VM_GDRIVE_SA_KEY_FILE",
+                                   str(BASE_DIR / "vm_sa_key.json")))
+    if not key_file.exists():
+        print(f"[!] VM service account key not found: {key_file}")
+        sys.exit(1)
+
+    info  = json.loads(key_file.read_text())
+    creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+    service = build("drive", "v3", credentials=creds)
+
+    data_folder_id = get_or_create_folder(service, "data", DRIVE_FOLDER_ID)
+
+    pushed = 0
+    for fname in DATA_FILES:
+        fpath = BASE_DIR / fname
+        if fpath.exists():
+            upload_file(service, fpath, data_folder_id)
+            print(f"  Pushed: {fname}")
+            pushed += 1
+        else:
+            print(f"  [skip] {fname} not found locally")
+
+    print(f"  VM push complete: {pushed}/{len(DATA_FILES)} files")
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "download":
         cmd_download()
     elif cmd == "upload":
         cmd_upload()
+    elif cmd == "vm_push":
+        cmd_vm_push()
     else:
-        print("Usage: python cloud_sync.py download|upload")
+        print("Usage: python cloud_sync.py download|upload|vm_push")
         sys.exit(1)
