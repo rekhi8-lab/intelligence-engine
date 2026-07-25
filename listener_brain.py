@@ -303,7 +303,8 @@ Return ONLY valid JSON, no text before or after:
                 normed.append(item)
             elif isinstance(item, str):
                 normed.append({"key": item, "score": 0.5, "sources": 1, "sample": ""})
-        result["trending_topics"] = normed
+        result["trending_topics"] = [item["key"] if isinstance(item, dict) else item for item in normed]
+        result["trending_topics_scored"] = normed
         return result
 
     except Exception as e:
