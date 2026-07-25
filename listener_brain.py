@@ -271,7 +271,7 @@ FIELD SPECIFICATIONS:
 
 Return ONLY valid JSON, no text before or after:
 {{
-  "trending_topics": [{"key": "", "score": 0.0, "sources": 0, "sample": ""}],
+  "trending_topics": [{{"key": "", "score": 0.0, "sources": 0, "sample": ""}}],
   "expanded_keywords": [],
   "content_gaps": [],
   "dominant_emotion": "",
