@@ -74,6 +74,7 @@ jobs:
         env:
           CLAUDE_API_KEY:    ${{ secrets.CLAUDE_API_KEY }}
           YOUTUBE_API_KEY:   ${{ secrets.YOUTUBE_API_KEY }}
+          SERPER_API_KEY:    ${{ secrets.SERPER_API_KEY }}
         run: python run_all.py
 
       # ── 6. Generate content drafts ───────────────────────────
