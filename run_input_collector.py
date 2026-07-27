@@ -299,14 +299,20 @@ def dispatch(text: str) -> str | None:
     if lower in ("/done", "/skip", "/proceed", "done", "skip"):
         return "__DONE__"
 
+    _AW_DIR = os.environ.get("AUTOMATION_WORKING_FOLDER", "/home/Acer/automation-working-folder")
+    if _AW_DIR not in sys.path:
+        sys.path.insert(0, _AW_DIR)
     try:
-        # Repo A path — not in systemd env; hardcoded for GitHub Actions + VM
-        _AW_DIR = "/home/Acer/automation-working-folder"
-        if _AW_DIR not in sys.path:
-            sys.path.insert(0, _AW_DIR)
         from input_handlers import handle_command
         return handle_command(text.strip())
-    except ImportError:
+    except ImportError as exc:
+        print(f"  [WARN] input_handlers ImportError ({exc}); path={_AW_DIR!r} — falling back to legacy dispatch")
+        tg_send(
+            f"⚠️ <b>[input_collector]</b> primary handler unreachable "
+            f"(<code>{exc}</code>). "
+            f"Some commands may not be fully processed. "
+            f"Check AUTOMATION_WORKING_FOLDER on the VM."
+        )
         return _legacy_dispatch(text.strip())
 
 
@@ -499,12 +505,7 @@ def run_input_collector():
     print(f"  [TG] Prompt sent to chat {CHAT_ID}.")
     print(f"  [TG] Waiting up to {minutes}m {secs_rem}s for inputs...")
 
-    _WINDOW_FLAG = Path("/tmp/intelligence_window_active")
-    try:
-        _WINDOW_FLAG.touch()
-        result = poll_telegram(TIMEOUT_SECS)
-    finally:
-        _WINDOW_FLAG.unlink(missing_ok=True)
+    result = poll_telegram(TIMEOUT_SECS)
 
     total = len(dispatch_items) + len(result["added"])
 
