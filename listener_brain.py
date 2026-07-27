@@ -3,6 +3,8 @@ print("INTELLIGENCE ENGINE v3.0")
 import os
 import json
 import time
+import html as _html
+import re
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -80,7 +82,7 @@ def get_youtube_data(queries: list[str]):
 
                     for c in comments.get("items", []):
                         top     = c["snippet"]["topLevelComment"]["snippet"]
-                        comment = top["textDisplay"].strip()
+                        comment = re.sub(r'\s+', ' ', _html.unescape(re.sub(r'<[^>]+>', ' ', top["textDisplay"]))).strip()
                         likes   = top.get("likeCount", 0)
                         if len(comment) > 25:
                             data.append({
