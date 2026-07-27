@@ -172,7 +172,10 @@ def build_data_sample(data: list[dict], n: int = 30) -> list[dict]:
     for item in ranked[:n]:
         sample.append({
             "source": item["source"],
-            "text":   item["text"][:300]
+            "text":   item["text"][:300],
+            "signal": item.get("signal", 0),
+            "link":   item.get("link") or item.get("url", ""),
+            "likes":  item.get("likes", 0)
         })
     return sample
 
